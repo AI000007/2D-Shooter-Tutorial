@@ -280,22 +280,19 @@ namespace _2D_Shooter_Tutorial
 
         private void UpdateRocket()
         {
-            if (_rocketFlying)
-            {
-                Vector2 gravity = new Vector2(0, 1);
-                _rocketDirection += gravity / 10.0f;
-                _rocketPosition += _rocketDirection;
-                _rocketAngle = (float)Math.Atan2(_rocketDirection.X, -_rocketDirection.Y);
 
-                for (int i = 0; i < 5; i++)
-                {
-                    Vector2 smokePos = _rocketPosition;
-                    smokePos.X += _randomiser.Next(10) - 5;
-                    smokePos.Y += _randomiser.Next(10) - 5;
-                    _smokeList.Add(smokePos);
-                }
+            Vector2 gravity = new Vector2(0, 1);
+            _rocketDirection += gravity / 10.0f;
+            _rocketPosition += _rocketDirection;
+            _rocketAngle = (float)Math.Atan2(_rocketDirection.X, -_rocketDirection.Y);
+
+            for (int i = 0; i < 5; i++)
+            {
+                Vector2 smokePos = _rocketPosition;
+                smokePos.X += _randomiser.Next(10) - 5;
+                smokePos.Y += _randomiser.Next(10) - 5;
+                _smokeList.Add(smokePos);
             }
-            else _smokeList.Clear();
         }
 
         private Vector2 TexturesCollide(Color[,] tex1, Matrix mat1, Color[,] tex2, Matrix mat2)
@@ -304,8 +301,8 @@ namespace _2D_Shooter_Tutorial
 
             int width1 = tex1.GetLength(0);
             int height1 = tex1.GetLength(1);
-            int width2 = tex1.GetLength(0);
-            int height2 = tex1.GetLength(1);
+            int width2 = tex2.GetLength(0);
+            int height2 = tex2.GetLength(1);
 
             for (int x1 = 0; x1 < width1; x1++)
             {
@@ -322,7 +319,7 @@ namespace _2D_Shooter_Tutorial
                         {
                             if (tex1[x1, y1].A > 0)
                             {
-                                if (tex1[x2, y2].A > 0)
+                                if (tex2[x2, y2].A > 0)
                                 {
                                     return Vector2.Transform(pos1, mat1);
                                 }
@@ -337,14 +334,105 @@ namespace _2D_Shooter_Tutorial
 
         }
 
-        private void CheckRocket()
+        private Vector2 CheckTerrainCollision()
         {
-            if ( _rocketFlying )
+            Matrix rocketMat = Matrix.CreateTranslation(-42, -240, 0) *
+                                Matrix.CreateRotationZ(_rocketAngle) *
+                                Matrix.CreateScale(_rocketScaling) *
+                                Matrix.CreateTranslation(_rocketPosition.X, _rocketPosition.Y, 0);
+            Matrix terrainMat = Matrix.Identity;
+            Vector2 terrainCollisonPoint = TexturesCollide(_rocketColorArray, rocketMat, _foregroundColorArray, terrainMat);
+            return terrainCollisonPoint;
+        }
+
+        private Vector2 CheckPlayerCollision()
+        {
+            Matrix rocketMat = Matrix.CreateTranslation(-42, -240, 0) *
+                    Matrix.CreateRotationZ(_rocketAngle) *
+                    Matrix.CreateScale(_rocketScaling) *
+                    Matrix.CreateTranslation(_rocketPosition.X, _rocketPosition.Y, 0);
+            
+            for (int i = 0; i < _numberOfPlayers; i++)
             {
-                if(_rocketPosition.X > _screenwidth || _rocketPosition.X < 0 || _rocketPosition.Y > _screenheight)
+                PlayerData player = _players[i];
+                if (player.IsAlive)
                 {
-                    _rocketFlying = false;
+                    if (i != _currentPlayer)
+                    {
+                        int xPos = (int)player.Position.X;
+                        int yPos = (int)player.Position.Y;
+
+                        Matrix carriageMat = Matrix.CreateTranslation(0, -_carriageTexture.Height, 0) *
+                                                Matrix.CreateScale(_playerScaling) *
+                                                Matrix.CreateTranslation(xPos, yPos, 0);
+
+                        Vector2 carriageCollisionPoint = TexturesCollide(_carriageColorArray, carriageMat, _rocketColorArray, rocketMat);
+                        if (carriageCollisionPoint.X > -1)
+                        {
+                            _players[i].IsAlive = false;
+                            return carriageCollisionPoint;
+                        }
+
+                        Matrix cannonMat = Matrix.CreateTranslation(-11, -50, 0) *
+                                            Matrix.CreateRotationZ(player.Angle) *
+                                            Matrix.CreateScale(_playerScaling) *
+                                            Matrix.CreateTranslation(xPos + 20, yPos - 10, 0);
+
+                        Vector2 cannonCollisionPoint = TexturesCollide(_cannonColorArray, cannonMat, _rocketColorArray, rocketMat);
+                        if (cannonCollisionPoint.X > -1)
+                        {
+                            _players[i].IsAlive = false;
+                            return cannonCollisionPoint;
+                        }
+                    }
                 }
+            }
+            return new Vector2(-1, -1);
+        }
+
+        private bool CheckOutOfScreen()
+        {
+            return (_rocketPosition.X > _screenwidth || _rocketPosition.X < 0 || _rocketPosition.Y > _screenheight);
+        }
+
+        private void CheckCollisions(GameTime gametime)
+        {
+            Vector2 terrainCollisionPoint = CheckTerrainCollision();
+            Vector2 playerCollisionPoint = CheckPlayerCollision();
+            bool rocketOutOfScreen = CheckOutOfScreen();
+
+
+            if (playerCollisionPoint.X >  -1)
+            {
+                _rocketFlying = false;
+                _smokeList.Clear();
+                NextPlayer();
+            }
+            
+            
+            else if (terrainCollisionPoint.X > -1)
+            {
+                _rocketFlying = false;
+                _smokeList.Clear();
+                NextPlayer();
+            }
+
+            else if (rocketOutOfScreen)
+            {
+                _rocketFlying = false;
+                _smokeList.Clear();
+                NextPlayer();
+            }
+        }
+
+        private void NextPlayer()
+        {
+            _currentPlayer++;
+            _currentPlayer %= _numberOfPlayers;
+            while (!_players[_currentPlayer].IsAlive)
+            {
+                _currentPlayer++;
+                _currentPlayer %= _numberOfPlayers;
             }
         }
 
@@ -355,8 +443,12 @@ namespace _2D_Shooter_Tutorial
 
             // TODO: Add your update logic here
             ProcessKeyboard();
-            CheckRocket();
-            UpdateRocket();
+            
+            if (_rocketFlying)
+            {
+                UpdateRocket();
+                CheckCollisions(gameTime);
+            }
 
 
             base.Update(gameTime);
@@ -410,7 +502,7 @@ namespace _2D_Shooter_Tutorial
             PlayerData player = _players[_currentPlayer];
             int currentAngle = (int)MathHelper.ToDegrees(player.Angle);
 
-            _spriteBatch.DrawString(_font, $"Player {_currentPlayer+1}", new Vector2(20, 5), player.Color);
+            _spriteBatch.DrawString(_font, $"Player {player.IsAlive}", new Vector2(20, 5), player.Color);
             _spriteBatch.DrawString(_font, $"Cannon Angle: {currentAngle}", new Vector2(20, 30), player.Color);
             _spriteBatch.DrawString(_font, $"Cannon Power: {player.Power}", new Vector2(20, 55), player.Color);
         }
