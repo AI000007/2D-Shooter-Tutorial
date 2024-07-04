@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
@@ -32,6 +33,11 @@ namespace _2D_Shooter_Tutorial
         private GraphicsDeviceManager _graphics;
         private SpriteBatch _spriteBatch;
         private GraphicsDevice _device;
+
+
+        private const bool _resolutionIndependent = true;
+        private Vector2 _baseScreenSize = new Vector2(800, 600);
+
 
         List<ParticleData> _particleList = new List<ParticleData>();
 
@@ -86,6 +92,10 @@ namespace _2D_Shooter_Tutorial
 
         private int[] _terrainContour;
 
+        private SoundEffect _hitTerrain;
+        private SoundEffect _hitCannon;
+        private SoundEffect _launch;
+
         public Game1()
         {
             _graphics = new GraphicsDeviceManager(this);
@@ -96,9 +106,9 @@ namespace _2D_Shooter_Tutorial
         protected override void Initialize()
         {
             // TODO: Add your initialization logic here
-            _graphics.PreferredBackBufferHeight = 920;
-            _graphics.PreferredBackBufferWidth = 1080;
-            _graphics.IsFullScreen = false;
+            //_graphics.PreferredBackBufferHeight = 920;
+            //_graphics.PreferredBackBufferWidth = 1080;
+            _graphics.IsFullScreen = true;
             _graphics.ApplyChanges();
             Window.Title = "2D Shooter";
 
@@ -214,8 +224,17 @@ namespace _2D_Shooter_Tutorial
             _explosionTexture = Content.Load<Texture2D>("explosion");
             _font = Content.Load<SpriteFont>("myFont");
 
-            _screenheight = _device.PresentationParameters.BackBufferHeight;
-            _screenwidth = _device.PresentationParameters.BackBufferWidth;
+            if (_resolutionIndependent)
+            {
+                _screenwidth = (int)_baseScreenSize.X;
+                _screenheight = (int)_baseScreenSize.Y;
+
+            }
+            else
+            {
+                _screenheight = _device.PresentationParameters.BackBufferHeight;
+                _screenwidth = _device.PresentationParameters.BackBufferWidth;
+            }
 
             _playerScaling = 40.0f / (float)_carriageTexture.Width;
 
@@ -229,6 +248,10 @@ namespace _2D_Shooter_Tutorial
             _carriageColorArray = TextureTo2DArray(_carriageTexture);
             _cannonColorArray = TextureTo2DArray(_cannonTexture);
             _explosionColorArray = TextureTo2DArray(_explosionTexture);
+
+            _hitCannon = Content.Load<SoundEffect>("hitcannon");
+            _hitTerrain = Content.Load<SoundEffect>("hitterrain");
+            _launch = Content.Load<SoundEffect>("launch");
         }
 
         private void ProcessKeyboard()
@@ -292,6 +315,8 @@ namespace _2D_Shooter_Tutorial
                 Matrix rotMatrix = Matrix.CreateRotationZ(_rocketAngle);
                 _rocketDirection = Vector2.Transform(up, rotMatrix);
                 _rocketDirection *= _players[_currentPlayer].Power / 50.0f;
+
+                _launch.Play();
             }
 
         }
@@ -422,6 +447,7 @@ namespace _2D_Shooter_Tutorial
 
             if (playerCollisionPoint.X >  -1)
             {
+                _hitCannon.Play();
                 _rocketFlying = false;
                 _smokeList.Clear();
                 AddExplosion(playerCollisionPoint, 10, 80.0f, 2000.0f, gametime);
@@ -431,6 +457,7 @@ namespace _2D_Shooter_Tutorial
             
             else if (terrainCollisionPoint.X > -1)
             {
+                _hitTerrain.Play();
                 _rocketFlying = false;
                 _smokeList.Clear();
                 AddExplosion(terrainCollisionPoint, 4, 30.0f, 1000.0f, gametime);
@@ -592,7 +619,21 @@ namespace _2D_Shooter_Tutorial
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
             // TODO: Add your drawing code here
-            _spriteBatch.Begin();
+            Vector3 screenScalingFactor;
+            if(_resolutionIndependent)
+            {
+                float horScaling = (float)_device.PresentationParameters.BackBufferWidth / _baseScreenSize.X;
+                float verScaling = (float)_device.PresentationParameters.BackBufferHeight / _baseScreenSize.Y;
+                screenScalingFactor = new Vector3(horScaling, verScaling, 1);
+            }
+            else
+            {
+                screenScalingFactor = new Vector3(1, 1, 1);
+            }
+
+            Matrix globalTransformation = Matrix.CreateScale(screenScalingFactor);
+
+            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, null, null, null, null, globalTransformation);
             DrawScenery();
             DrawPlayers();
             DrawText();
@@ -600,7 +641,7 @@ namespace _2D_Shooter_Tutorial
             DrawSmoke();
             _spriteBatch.End();
 
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive);
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, null, null, null, null, globalTransformation);
             DrawExplosion();
             _spriteBatch.End();
 

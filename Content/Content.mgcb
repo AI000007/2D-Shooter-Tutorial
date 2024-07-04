@@ -85,6 +85,24 @@
 /processorParam:TextureFormat=Color
 /build:ground.jpg
 
+#begin hitcannon.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:hitcannon.wav
+
+#begin hitterrain.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:hitterrain.wav
+
+#begin launch.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:launch.wav
+
 #begin myFont.spritefont
 /importer:FontDescriptionImporter
 /processor:FontDescriptionProcessor
